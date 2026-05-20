@@ -1,5 +1,5 @@
 # 这个模块统一生成消息推送的标题和正文。
-# 主流程只提供结构化快照数据，正文区块顺序完全由配置控制。
+# 主流程只提供结构化快照数据，正文固定整理为四个部分。
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -16,38 +16,30 @@ DEFAULT_TITLES = {
 }
 
 DEFAULT_LAYOUTS = {
-    # 这里给出四种结果状态各自的默认区块顺序。
+    # 这里给出四种结果状态各自的默认四段正文顺序。
     "success_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "force_push",
-        "source",
-        "status",
+        "delivery",
     ],
     "failure_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "reason",
-        "source",
-        "status",
+        "delivery",
     ],
     "exception_sections": [
-        "reason",
-        "stage",
-        "error_location",
-        "context",
-        "source",
-        "status",
-    ],
-    "repeated_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "force_push",
-        "source",
-        "status",
+        "delivery",
+    ],
+    "repeated_sections": [
+        "overview",
+        "recent_signs",
+        "profile",
+        "delivery",
     ],
 }
 
@@ -63,7 +55,7 @@ LAYOUT_KEY_BY_STATUS = {
 def build_message(
     snapshot: ExecutionSnapshot, layout_config: dict[str, list[str]]
 ) -> dict[str, str]:
-    # 标题按最终状态选取，正文区块顺序按配置中的数组决定。
+    # 标题按最终状态选取，正文按固定四段结构生成。
     title = snapshot.final_title or DEFAULT_TITLES.get(
         snapshot.final_status, "习讯云签到异常"
     )
@@ -78,20 +70,17 @@ def build_message(
 def _compose_body(
     snapshot: ExecutionSnapshot, layout_config: dict[str, list[str]]
 ) -> str:
-    # 每种结果状态都会选出一组区块顺序，再按顺序逐段生成正文。
-    layout_key = LAYOUT_KEY_BY_STATUS.get(snapshot.final_status, "exception_sections")
-    section_order = layout_config.get(layout_key, DEFAULT_LAYOUTS[layout_key])
+    # 正文始终整理为四个部分，旧配置里的区块名会自动回退到默认顺序。
+    layout_key = LAYOUT_KEY_BY_STATUS.get(
+        snapshot.final_status, "exception_sections"
+    )
+    section_order = _resolve_section_order(layout_key, layout_config)
     builders: dict[str, Callable[[ExecutionSnapshot], str]] = {
-        "score_summary": _build_score_summary_section,
+        # 四个区块名和实际构造函数的对应关系只在这里维护。
+        "overview": _build_overview_section,
         "recent_signs": _build_recent_signs_section,
         "profile": _build_profile_section,
-        "force_push": _build_force_push_section,
-        "source": _build_source_section,
-        "status": _build_status_section,
-        "reason": _build_reason_section,
-        "stage": _build_stage_section,
-        "error_location": _build_error_location_section,
-        "context": _build_context_section,
+        "delivery": _build_delivery_section,
     }
 
     sections: list[str] = []
@@ -106,10 +95,61 @@ def _compose_body(
     if sections:
         return "\n\n".join(sections).strip()
 
-    # 配置把所有有效区块都移除时，正文仍然会至少保留一个可读结果。
-    return _build_reason_section(snapshot) or _build_status_section(
-        snapshot
-    ) or "当前没有可展示的消息内容"
+    # 四个部分都没有可展示内容时，正文仍然会至少保留一个可读结果。
+    fallback_section = _build_overview_section(snapshot)
+    if fallback_section:
+        return fallback_section
+
+    fallback_section = _build_recent_signs_section(snapshot)
+    if fallback_section:
+        return fallback_section
+
+    fallback_section = _build_profile_section(snapshot)
+    if fallback_section:
+        return fallback_section
+
+    fallback_section = _build_delivery_section(snapshot)
+    if fallback_section:
+        return fallback_section
+
+    return "当前没有可展示的消息内容"
+
+
+def _resolve_section_order(
+    layout_key: str, layout_config: dict[str, list[str]]
+) -> list[str]:
+    # 只有显式提供四个新部分且不重复时，才按配置顺序展示，否则回退到默认顺序。
+    configured_order = layout_config.get(layout_key, [])
+    if not isinstance(configured_order, list):
+        return DEFAULT_LAYOUTS[layout_key]
+
+    normalized_order: list[str] = []
+    valid_section_names = set(DEFAULT_LAYOUTS[layout_key])
+    for section_name in configured_order:
+        normalized_name = _normalize_text(section_name)
+        is_valid_section = normalized_name in valid_section_names
+        is_new_section = normalized_name not in normalized_order
+        if is_valid_section and is_new_section:
+            normalized_order.append(normalized_name)
+
+    if len(normalized_order) == len(valid_section_names):
+        return normalized_order
+    # 任意一个区块缺失、重名或写错时，正文顺序统一回退到默认布局。
+    return DEFAULT_LAYOUTS[layout_key]
+
+
+def _build_overview_section(snapshot: ExecutionSnapshot) -> str:
+    # 第一部分固定展示积分摘要、结果标签和接口结果，失败与异常时会继续补充原因和错误定位信息。
+    lines: list[str] = []
+    _extend_section_lines(lines, _build_score_summary_section(snapshot))
+    _extend_section_lines(lines, _build_status_section(snapshot))
+    if snapshot.final_status in {"failure", "exception"}:
+        _extend_section_lines(lines, _build_reason_section(snapshot))
+    if snapshot.final_status == "exception":
+        _extend_section_lines(lines, _build_stage_section(snapshot))
+        _extend_section_lines(lines, _build_error_location_section(snapshot))
+        _extend_section_lines(lines, _build_context_section(snapshot))
+    return "\n".join(lines).strip()
 
 
 def _build_score_summary_section(snapshot: ExecutionSnapshot) -> str:
@@ -119,7 +159,8 @@ def _build_score_summary_section(snapshot: ExecutionSnapshot) -> str:
     if score_summary:
         lines.append(score_summary)
     _append_combined_line(
-        lines, [("当前积分", snapshot.point), ("积分排名", snapshot.point_rank)]
+        lines,
+        [("当前积分", snapshot.point), ("积分排名", snapshot.point_rank)],
     )
     return "\n".join(lines).strip()
 
@@ -149,8 +190,19 @@ def _build_profile_section(snapshot: ExecutionSnapshot) -> str:
     )
     _append_combined_line(
         lines,
-        [("入学年份", snapshot.entrance_year), ("毕业年份", snapshot.graduation_year)],
+        [
+            ("入学年份", snapshot.entrance_year),
+            ("毕业年份", snapshot.graduation_year),
+        ],
     )
+    return "\n".join(lines).strip()
+
+
+def _build_delivery_section(snapshot: ExecutionSnapshot) -> str:
+    # 第四部分固定展示消息来源和强制推送状态。
+    lines: list[str] = []
+    _extend_section_lines(lines, _build_source_section(snapshot))
+    _extend_section_lines(lines, _build_force_push_section(snapshot))
     return "\n".join(lines).strip()
 
 
@@ -208,7 +260,11 @@ def _build_error_location_section(snapshot: ExecutionSnapshot) -> str:
 
 def _build_context_section(snapshot: ExecutionSnapshot) -> str:
     # 异常上下文优先展示已经整理好的上下文行，缺失时再展示堆栈文本。
-    lines = [_normalize_text(item) for item in snapshot.context_lines if _normalize_text(item)]
+    lines = [
+        _normalize_text(item)
+        for item in snapshot.context_lines
+        if _normalize_text(item)
+    ]
     if not lines and snapshot.error_traceback:
         lines = [
             _normalize_text(line)
@@ -223,7 +279,7 @@ def _build_score_summary_line(snapshot: ExecutionSnapshot) -> str:
     parts = _collect_value_parts(
         [
             ("本次签到获得 {value} 积分", snapshot.sign_point),
-            ("本月已签到 {value} 天", snapshot.sign_in_month_count),
+            ("本月签到 {value} 天", snapshot.sign_in_month_count),
             ("连续签到 {value} 天", snapshot.continuous_sign_in),
         ]
     )
@@ -260,6 +316,14 @@ def _append_labeled_line(lines: list[str], label: str, value: object) -> None:
     text = _normalize_text(value)
     if text:
         lines.append(f"{label}：{text}")
+
+
+def _extend_section_lines(lines: list[str], section_text: str) -> None:
+    # 复合区块会把已有子区块按行拆开追加，保证区块内部没有空行。
+    for line in section_text.splitlines():
+        normalized_line = _normalize_text(line)
+        if normalized_line:
+            lines.append(normalized_line)
 
 
 def _collect_value_parts(patterns: list[tuple[str, object]]) -> list[str]:

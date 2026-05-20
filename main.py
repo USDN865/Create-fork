@@ -69,7 +69,9 @@ def main() -> int:
     try:
         # 只有配置加载成功后，程序才继续初始化日志器、原始响应记录器、HTTP 客户端和重试管理器。
         config = load_config(CONFIG_PATH, environment.is_github_actions)
-        logger = RunLogger(config.runtime.timezone_name, config.runtime.time_format)
+        logger = RunLogger(
+            config.runtime.timezone_name, config.runtime.time_format
+        )
         response_recorder = ResponseRecorder(
             timezone_name=config.runtime.timezone_name,
             time_format=config.runtime.time_format,
@@ -81,16 +83,21 @@ def main() -> int:
             config.runtime.request_timeout_seconds, response_recorder
         )
         retry_manager = RetryManager(
-            config.runtime.retry_attempts, config.runtime.retry_interval_seconds, logger
+            config.runtime.retry_attempts,
+            config.runtime.retry_interval_seconds,
+            logger,
         )
 
         # 这些快照字段会被消息推送和 Summary 反复复用，所以会在流程最前面统一补齐。
         snapshot.current_time_text = format_datetime(
-            now_in_timezone(config.runtime.timezone_name), config.runtime.time_format
+            now_in_timezone(config.runtime.timezone_name),
+            config.runtime.time_format,
         )
         snapshot.today_text = today_text(config.runtime.timezone_name)
         snapshot.force_push_active, snapshot.force_push_source = (
-            resolve_force_push_with_source(config, environment.is_github_actions)
+            resolve_force_push_with_source(
+                config, environment.is_github_actions
+            )
         )
         snapshot.config_sources_text = build_config_source_lines(
             config, environment, snapshot.force_push_source
@@ -136,10 +143,16 @@ def main() -> int:
             target_sign_type=config.sign.target_type,
         )
         snapshot.initial_query_message = initial_sign_home.message
-        snapshot.initial_query_signed_today = initial_query_details["signed_today"]
+        snapshot.initial_query_signed_today = initial_query_details[
+            "signed_today"
+        ]
         snapshot.recent_sign_times = initial_query_details["recent_sign_times"]
-        snapshot.sign_in_month_count = str(initial_query_details["sign_in_month_count"])
-        snapshot.continuous_sign_in = str(initial_query_details["continuous_sign_in"])
+        snapshot.sign_in_month_count = str(
+            initial_query_details["sign_in_month_count"]
+        )
+        snapshot.continuous_sign_in = str(
+            initial_query_details["continuous_sign_in"]
+        )
 
         # 发起签到前会先整理最终提交参数，包括地址、经纬度和签到类型。
         sign_payload = prepare_sign_payload(
@@ -189,11 +202,17 @@ def main() -> int:
             require_remark=False,
             target_sign_type=config.sign.target_type,
         )
-        snapshot.verify_query_signed_today = verify_query_details["signed_today"]
+        snapshot.verify_query_signed_today = verify_query_details[
+            "signed_today"
+        ]
         snapshot.verify_query_message = verify_sign_home.message
         snapshot.recent_sign_times = verify_query_details["recent_sign_times"]
-        snapshot.sign_in_month_count = str(verify_query_details["sign_in_month_count"])
-        snapshot.continuous_sign_in = str(verify_query_details["continuous_sign_in"])
+        snapshot.sign_in_month_count = str(
+            verify_query_details["sign_in_month_count"]
+        )
+        snapshot.continuous_sign_in = str(
+            verify_query_details["continuous_sign_in"]
+        )
 
         # 最终状态必须同时结合发起签到接口结果和再次查询结果判定。
         finalize_sign_result(snapshot)
@@ -242,10 +261,14 @@ def main() -> int:
         snapshot.error_traceback = "".join(
             traceback.format_exception(type(exc), exc, exc.__traceback__)
         )
-        snapshot.error_file, snapshot.error_line = extract_exception_location(exc)
+        snapshot.error_file, snapshot.error_line = extract_exception_location(
+            exc
+        )
         if logger:
             logger.error(snapshot.error_stage, snapshot.reason)
-            logger.error(snapshot.error_stage, snapshot.error_traceback.strip())
+            logger.error(
+                snapshot.error_stage, snapshot.error_traceback.strip()
+            )
         else:
             print(f"[{snapshot.error_stage}] {snapshot.reason}")
             print(snapshot.error_traceback.strip())
@@ -257,19 +280,24 @@ def main() -> int:
     finally:
         # 原始响应落盘、缓存清理、Summary 写入和客户端关闭，无论成功还是失败都必须执行。
         if logger and config:
-            snapshot.current_time_text = snapshot.current_time_text or format_datetime(
-                now_in_timezone(config.runtime.timezone_name),
-                config.runtime.time_format,
-            )
+            if not snapshot.current_time_text:
+                snapshot.current_time_text = format_datetime(
+                    now_in_timezone(config.runtime.timezone_name),
+                    config.runtime.time_format,
+                )
             if response_recorder:
                 # 原始响应输出路径要先写回快照，后面的 Summary 和日志才能直接引用。
-                snapshot.raw_response_output_path = response_recorder.finalize()
+                snapshot.raw_response_output_path = (
+                    response_recorder.finalize()
+                )
                 if snapshot.raw_response_output_path:
                     logger.info(
                         "原始响应输出",
                         f"原始响应已写入 {snapshot.raw_response_output_path}",
                     )
-        cleanup_logger = logger or RunLogger("Asia/Shanghai", "%Y-%m-%d %H:%M:%S")
+        cleanup_logger = logger or RunLogger(
+            "Asia/Shanghai", "%Y-%m-%d %H:%M:%S"
+        )
         cleanup_runtime_artifacts(str(Path.cwd()), cleanup_logger)
         if logger and config:
             snapshot.timeline = logger.timeline
@@ -281,7 +309,9 @@ def main() -> int:
 def build_environment() -> RunEnvironment:
     # 运行环境上下文全部从当前进程环境变量提取。
     # 当前是否运行在 GitHub Actions 中，只由 GITHUB_ACTIONS 的值决定。
-    is_github_actions = os.getenv("GITHUB_ACTIONS", "").strip().lower() == "true"
+    is_github_actions = (
+        os.getenv("GITHUB_ACTIONS", "").strip().lower() == "true"
+    )
     source_label = "GitHub Actions" if is_github_actions else "本地运行"
     workflow_ref = os.getenv("GITHUB_WORKFLOW_REF", "").strip()
     workflow_sha = os.getenv("GITHUB_WORKFLOW_SHA", "").strip()
@@ -314,6 +344,7 @@ def build_config_source_lines(
     config: ResolvedConfig, environment: RunEnvironment, force_push_source: str
 ) -> list[str]:
     # 这里把 source_map 中的来源标识翻译成可直接写进 Summary 的中文说明。
+    # ordered_keys 先固定核心字段顺序，其余动态模板字段再按键名追加到后面。
     ordered_keys = [
         "runtime.timezone",
         "runtime.time_format",
@@ -340,7 +371,9 @@ def build_config_source_lines(
         "notification.request.method",
         "notification.request.body_type",
     ]
-    remaining_keys = sorted(key for key in config.source_map if key not in ordered_keys)
+    remaining_keys = sorted(
+        key for key in config.source_map if key not in ordered_keys
+    )
     lines: list[str] = []
 
     for key in ordered_keys + remaining_keys:
@@ -353,7 +386,8 @@ def build_config_source_lines(
         if not source_id:
             continue
         lines.append(
-            f"{describe_source_key(key)}：{describe_source_value(source_id, environment, config)}"
+            f"{describe_source_key(key)}："
+            f"{describe_source_value(source_id, environment, config)}"
         )
     return lines
 
@@ -420,7 +454,8 @@ def describe_source_value(
         return "已从运行时消息变量读取"
     if source_id.startswith("secret_json:"):
         return (
-            f"已从 GitHub Repository Secret {config.github_secret_overrides_env} 读取"
+            "已从 GitHub Repository Secret "
+            f"{config.github_secret_overrides_env} 读取"
         )
     if source_id.startswith("workflow_input:"):
         env_name = source_id.removeprefix("workflow_input:")
@@ -438,7 +473,8 @@ def describe_source_value(
 def build_workflow_info_lines(
     environment: RunEnvironment, force_push_active: bool
 ) -> list[str]:
-    # 工作流信息区块只展示当前运行环境里能够实际拿到的上下文字段。
+    # 工作流信息区块围绕当前运行环境的上下文字段构造。
+    # 字段缺失时不会省略，而是填入明确提示文本，保证 Summary 结构稳定。
     beijing_time_text = format_datetime(
         now_in_timezone("Asia/Shanghai"), "%Y-%m-%d %H:%M:%S:%f"
     )[:-3]
@@ -446,19 +482,66 @@ def build_workflow_info_lines(
     initiated_run_by = environment.triggering_actor or environment.actor_name
     return [
         f"Force Push Message：{str(force_push_active)}",
-        f"Branch Name：{describe_runtime_value(environment.branch_name, '当前环境未提供 GITHUB_REF_NAME 或 GITHUB_REF')}",
-        f"Triggered By：{describe_runtime_value(environment.event_name, '当前环境未提供 GITHUB_EVENT_NAME')}",
-        f"Initial Run By：{describe_runtime_value(environment.actor_name, '当前环境未提供 GITHUB_ACTOR')}",
-        f"Initial Run By ID：{describe_runtime_value(environment.actor_id, '当前环境未提供 GITHUB_ACTOR_ID')}",
-        f"Initiated Run By：{describe_runtime_value(initiated_run_by, '当前环境未提供 GITHUB_TRIGGERING_ACTOR')}",
-        f"Repository Name：{describe_runtime_value(environment.repository_name, '当前环境未提供 GITHUB_REPOSITORY')}",
-        f"Commit SHA：{describe_runtime_value(environment.commit_sha, '当前环境未提供 GITHUB_SHA')}",
-        f"Workflow Name：{describe_runtime_value(resolve_workflow_name(environment), '当前环境未提供 GITHUB_WORKFLOW')}",
-        f"Workflow Number：{describe_runtime_value(environment.run_number, '当前环境未提供 GITHUB_RUN_NUMBER')}",
-        f"Workflow ID：{describe_runtime_value(environment.run_id, '当前环境未提供 GITHUB_RUN_ID')}",
+        build_workflow_info_line(
+            "Branch Name",
+            environment.branch_name,
+            "当前环境未提供 GITHUB_REF_NAME 或 GITHUB_REF",
+        ),
+        build_workflow_info_line(
+            "Triggered By",
+            environment.event_name,
+            "当前环境未提供 GITHUB_EVENT_NAME",
+        ),
+        build_workflow_info_line(
+            "Initial Run By",
+            environment.actor_name,
+            "当前环境未提供 GITHUB_ACTOR",
+        ),
+        build_workflow_info_line(
+            "Initial Run By ID",
+            environment.actor_id,
+            "当前环境未提供 GITHUB_ACTOR_ID",
+        ),
+        build_workflow_info_line(
+            "Initiated Run By",
+            initiated_run_by,
+            "当前环境未提供 GITHUB_TRIGGERING_ACTOR",
+        ),
+        build_workflow_info_line(
+            "Repository Name",
+            environment.repository_name,
+            "当前环境未提供 GITHUB_REPOSITORY",
+        ),
+        build_workflow_info_line(
+            "Commit SHA",
+            environment.commit_sha,
+            "当前环境未提供 GITHUB_SHA",
+        ),
+        build_workflow_info_line(
+            "Workflow Name",
+            resolve_workflow_name(environment),
+            "当前环境未提供 GITHUB_WORKFLOW",
+        ),
+        build_workflow_info_line(
+            "Workflow Number",
+            environment.run_number,
+            "当前环境未提供 GITHUB_RUN_NUMBER",
+        ),
+        build_workflow_info_line(
+            "Workflow ID",
+            environment.run_id,
+            "当前环境未提供 GITHUB_RUN_ID",
+        ),
         f"Beijing Time：{beijing_time_text}",
         "Copyright © 2026 NianBroken. All rights reserved.",
     ]
+
+
+def build_workflow_info_line(
+    label: str, value: str, missing_message: str
+) -> str:
+    # 工作流字段统一通过这里格式化，避免每个字段重复拼接长表达式。
+    return f"{label}：{describe_runtime_value(value, missing_message)}"
 
 
 def resolve_workflow_name(environment: RunEnvironment) -> str:
@@ -520,9 +603,15 @@ def resolve_school_id(
 ) -> str:
     # 学校 ID 已存在时会直接跳过学校查询接口，严格遵守配置优先规则。
     if config.account.school_id:
-        logger.success("学校 ID 获取", "已直接使用配置中的学校 ID，不访问学校查询接口")
+        logger.success(
+            "学校 ID 获取", "已直接使用配置中的学校 ID，不访问学校查询接口"
+        )
         set_stage_result(
-            snapshot, "school_id", "未执行", "skipped", "已直接使用配置中的学校 ID"
+            snapshot,
+            "school_id",
+            "未执行",
+            "skipped",
+            "已直接使用配置中的学校 ID",
         )
         return config.account.school_id
 
@@ -538,7 +627,9 @@ def resolve_school_id(
             return True, format_business_error(result)
         if result.code != 20000:
             return True, format_business_error(result)
-        matched_school_id = find_school_id(result.json_body, target_school_name)
+        matched_school_id = find_school_id(
+            result.json_body, target_school_name
+        )
         if not matched_school_id:
             return True, "学校名称精确匹配失败，未找到对应学校"
         return False, ""
@@ -560,7 +651,9 @@ def resolve_school_id(
             SCHOOL_MAP_ENDPOINT.name,
         )
     logger.success("学校 ID 获取", "已成功解析学校 ID")
-    set_stage_result(snapshot, "school_id", result.code, "success", "已成功解析学校 ID")
+    set_stage_result(
+        snapshot, "school_id", result.code, "success", "已成功解析学校 ID"
+    )
     snapshot.school_name = target_school_name
     return matched_school_id
 
@@ -578,7 +671,8 @@ def find_school_id(json_body: dict | None, target_school_name: str) -> str:
         for school in province.get("list", []):
             if not isinstance(school, dict):
                 continue
-            if str(school.get("school_name", "")).strip() == target_school_name:
+            school_name = str(school.get("school_name", "")).strip()
+            if school_name == target_school_name:
                 return str(school.get("school_id", "")).strip()
     return ""
 
@@ -705,7 +799,9 @@ def query_sign_home(
         stage_key,
         result.code,
         get_result_status(result),
-        format_business_error(result) if result.code != 20000 else result.message,
+        format_business_error(result)
+        if result.code != 20000
+        else result.message,
     )
     if result.code != 20000:
         # 请求异常、HTTP 状态缺失或 JSON 不合法时归为 exception，其余非 20000 归为 failure。
@@ -743,7 +839,9 @@ def parse_sign_home(
     )
     if not isinstance(data, dict):
         raise WorkflowError(
-            stage, "签到查询接口的 data 字段不是对象结构", SIGN_HOME_ENDPOINT.name
+            stage,
+            "签到查询接口的 data 字段不是对象结构",
+            SIGN_HOME_ENDPOINT.name,
         )
 
     # 首次签到查询必须先从 mark_list 中找到配置要求的签到类型键值。
@@ -784,13 +882,18 @@ def parse_sign_home(
         else {}
     )
     sign_in_month = (
-        data.get("sign_in_month") if isinstance(data.get("sign_in_month"), list) else []
+        data.get("sign_in_month")
+        if isinstance(data.get("sign_in_month"), list)
+        else []
     )
     signed_today = has_signed_today(
         data, sign_in_month, snapshot.today_text, config.runtime.timezone_name
     )
     recent_sign_times = parse_sign_history_items(
-        sign_in_month, config.runtime.timezone_name, config.runtime.time_format, limit=5
+        sign_in_month,
+        config.runtime.timezone_name,
+        config.runtime.time_format,
+        limit=5,
     )
 
     return {
@@ -825,6 +928,7 @@ def has_signed_today(
                 continue
 
     root_sign_time = str(data.get("sign_time", "")).strip()
+    # 根节点 sign_time 仍然可能保留当天日期文本，因此这里继续做最后一次兜底判断。
     if root_sign_time and root_sign_time.startswith(today_value):
         return True
     return False
@@ -842,9 +946,10 @@ def prepare_sign_payload(
     if not isinstance(sign_resources_info, dict):
         sign_resources_info = {}
 
-    address_value = (
-        account.address or str(sign_resources_info.get("mid_sign_address", "")).strip()
-    )
+    fallback_address = str(
+        sign_resources_info.get("mid_sign_address", "")
+    ).strip()
+    address_value = account.address or fallback_address
     address_name_value = account.address_name or default_address_name
     longitude_value = account.longitude or stringify_number(
         sign_resources_info.get("mid_sign_longitude")
@@ -882,9 +987,7 @@ def prepare_sign_payload(
     if not remark_value:
         raise WorkflowError(
             "发起签到前的数据准备",
-            "签到类型缺失，无法确定 "
-            f"{target_sign_type}"
-            " 对应的 remark",
+            f"签到类型缺失，无法确定 {target_sign_type} 对应的 remark",
             final_status="failure",
         )
 
@@ -915,7 +1018,9 @@ def stringify_number(value: object) -> str:
     return str(value).strip()
 
 
-def find_sign_type_remark(mark_list: list[object], target_sign_type: str) -> str:
+def find_sign_type_remark(
+    mark_list: list[object], target_sign_type: str
+) -> str:
     # 这个函数专门负责从 mark_list 中找出配置指定的签到类型对应的 key。
     normalized_target = target_sign_type.strip()
     for item in mark_list:
@@ -985,9 +1090,15 @@ def submit_sign(
 
     result = retry_manager.execute("发起签到", action, should_retry)
     # 阶段结果里会单独把 64032 归类为 repeated，方便最终状态和消息文案区分。
-    submit_status = "repeated" if result.code == 64032 else get_result_status(result)
-    submit_detail = result.message if result.message else format_business_error(result)
-    set_stage_result(snapshot, "sign_submit", result.code, submit_status, submit_detail)
+    submit_status = (
+        "repeated" if result.code == 64032 else get_result_status(result)
+    )
+    submit_detail = (
+        result.message if result.message else format_business_error(result)
+    )
+    set_stage_result(
+        snapshot, "sign_submit", result.code, submit_status, submit_detail
+    )
     if result.code in {20000, 64032}:
         logger.success("发起签到", f"发起签到接口返回业务码 {result.code}")
     return result
@@ -1007,24 +1118,28 @@ def apply_sign_submit_snapshot(
     if isinstance(data, dict):
         snapshot.sign_point = str(data.get("point", "")).strip()
         if not snapshot.continuous_sign_in:
-            snapshot.continuous_sign_in = str(data.get("continuous", "")).strip()
+            snapshot.continuous_sign_in = str(
+                data.get("continuous", "")
+            ).strip()
 
 
 def finalize_sign_result(snapshot: ExecutionSnapshot) -> None:
     # 最终状态判定同时依赖发起签到接口业务码和签到后验证结果。
-    if snapshot.sign_api_code == "20000" and snapshot.verify_query_signed_today:
-        snapshot.final_status = "success"
-        snapshot.final_title = DEFAULT_TITLES["success"]
-        snapshot.reason = "发起签到接口返回成功，签到查询接口确认今天已签到"
-        return
+    if snapshot.sign_api_code == "20000":
+        if snapshot.verify_query_signed_today:
+            snapshot.final_status = "success"
+            snapshot.final_title = DEFAULT_TITLES["success"]
+            snapshot.reason = "发起签到接口返回成功，签到查询接口确认今天已签到"
+            return
 
-    if snapshot.sign_api_code == "64032" and snapshot.verify_query_signed_today:
-        snapshot.final_status = "repeated"
-        snapshot.final_title = DEFAULT_TITLES["repeated"]
-        snapshot.reason = (
-            "发起签到接口返回今日签到次数已满，签到查询接口确认今天已经签过到"
-        )
-        return
+    if snapshot.sign_api_code == "64032":
+        if snapshot.verify_query_signed_today:
+            snapshot.final_status = "repeated"
+            snapshot.final_title = DEFAULT_TITLES["repeated"]
+            snapshot.reason = (
+                "发起签到接口返回今日签到次数已满，签到查询接口确认今天已经签过到"
+            )
+            return
 
     # 其余所有组合都视为未能确认签到成功。
     snapshot.final_status = "failure"
@@ -1048,9 +1163,15 @@ def emit_notification_if_needed(
         return
 
     if snapshot.final_status == "repeated" and not snapshot.force_push_active:
-        logger.info("消息推送", "当前结果为重复签到，且未启用强制推送，默认不发送消息")
+        logger.info(
+            "消息推送", "当前结果为重复签到，且未启用强制推送，默认不发送消息"
+        )
         set_stage_result(
-            snapshot, "notification", "未执行", "skipped", "重复签到且未启用强制推送"
+            snapshot,
+            "notification",
+            "未执行",
+            "skipped",
+            "重复签到且未启用强制推送",
         )
         return
 
@@ -1084,7 +1205,9 @@ def emit_notification(
     snapshot.environment_label = environment.source_label
     try:
         # 先根据快照生成消息变量，再交给动态请求模板完成发送。
-        message_payload = build_message(snapshot, config.notification.message_layouts)
+        message_payload = build_message(
+            snapshot, config.notification.message_layouts
+        )
         notification_response = send_notification(
             config.notification.request_template,
             message_payload,
@@ -1128,7 +1251,11 @@ def emit_notification(
         snapshot.context_lines.append("消息推送发送失败")
         snapshot.context_lines.append(error_text.strip())
         set_stage_result(
-            snapshot, "notification", "异常", "exception", f"消息发送失败: {exc}"
+            snapshot,
+            "notification",
+            "异常",
+            "exception",
+            f"消息发送失败: {exc}",
         )
         logger.error("消息推送", f"消息发送失败: {exc}")
         logger.error("消息推送", error_text.strip())
@@ -1182,12 +1309,16 @@ def write_minimal_summary_if_possible(
     if workflow_info_lines:
         lines.append("## 工作流信息")
         lines.extend(workflow_info_lines)
-    Path(summary_path).write_text(join_summary_lines(lines) + "\n", encoding="utf-8")
+    Path(summary_path).write_text(
+        join_summary_lines(lines) + "\n", encoding="utf-8"
+    )
 
 
 def join_summary_lines(lines: list[str]) -> str:
     # 最小化 Summary 统一使用一行正文加一个空行的拼接格式。
-    normalized_lines = [line.strip() for line in lines if line and line.strip()]
+    normalized_lines = [
+        line.strip() for line in lines if line and line.strip()
+    ]
     return "\n\n".join(normalized_lines).strip()
 
 

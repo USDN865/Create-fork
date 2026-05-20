@@ -20,11 +20,17 @@ RUNS_PER_PAGE = 100
 @dataclass(slots=True)
 class CleanupConfig:
     # 所有运行参数都集中放在这里，方便统一校验和后续扩展。
+    # repository_name 表示当前要清理哪个仓库的运行记录。
     repository_name: str
+    # token 表示调用 GitHub Actions REST API 时使用的访问令牌。
     token: str
+    # current_run_id 表示当前这次工作流运行的 ID，避免把自己删掉。
     current_run_id: int
+    # hour_count 表示保留时长阈值，单位为小时。
     hour_count: int
+    # api_base_url 表示当前环境下 GitHub API 的基础地址。
     api_base_url: str
+    # summary_path 表示当前 Job Summary 文件路径，缺失时跳过摘要写入。
     summary_path: str
 
 
@@ -40,18 +46,22 @@ class WorkflowRunCleaner:
         # 列表接口地址在初始化阶段一次性拼好，后续分页遍历直接复用。
         self.runs_url = (
             f"{self.config.api_base_url.rstrip('/')}"
-            f"/repos/{self.config.repository_name}/actions/runs?per_page={RUNS_PER_PAGE}"
+            f"/repos/{self.config.repository_name}/actions/runs"
+            f"?per_page={RUNS_PER_PAGE}"
         )
 
     def run(self) -> int:
         # 这里通过多轮遍历规避删除后的分页位移，避免旧记录被漏掉。
         self.log("Delete old workflow runs started.")
         self.log(
-            f"Repository: {self.config.repository_name} | Current Run ID: {self.config.current_run_id} | Hour Count: {self.config.hour_count}"
+            f"Repository: {self.config.repository_name} | "
+            f"Current Run ID: {self.config.current_run_id} | "
+            f"Hour Count: {self.config.hour_count}"
         )
         any_deleted = True
 
         while any_deleted:
+            # 只要本轮删掉过记录，就重新从第一页开始扫描，避免分页位移造成遗漏。
             any_deleted = False
             next_url = self.runs_url
 
@@ -109,11 +119,16 @@ class WorkflowRunCleaner:
         except ValueError:
             return False
 
-        return self.current_time - created_at > timedelta(hours=self.config.hour_count)
+        return self.current_time - created_at > timedelta(
+            hours=self.config.hour_count
+        )
 
     def delete_run(self, run_id: int) -> None:
         # 这里删除单条运行记录，并把结果明确写入日志。
-        delete_url = f"{self.config.api_base_url.rstrip('/')}/repos/{self.config.repository_name}/actions/runs/{run_id}"
+        delete_url = (
+            f"{self.config.api_base_url.rstrip('/')}"
+            f"/repos/{self.config.repository_name}/actions/runs/{run_id}"
+        )
         try:
             _, _, status_code = self.request("DELETE", delete_url)
         except RuntimeError as exc:
@@ -125,9 +140,14 @@ class WorkflowRunCleaner:
             self.log(f"Deleted run with ID {run_id}")
             return
 
-        self.log(f"Failed to delete run with ID {run_id}. Status code: {status_code}")
+        self.log(
+            f"Failed to delete run with ID {run_id}. "
+            f"Status code: {status_code}"
+        )
 
-    def request_json(self, method: str, url: str) -> tuple[Any, dict[str, str]]:
+    def request_json(
+        self, method: str, url: str
+    ) -> tuple[Any, dict[str, str]]:
         # JSON 接口统一从这里发出，解析失败时抛出明确异常。
         raw_text, headers, _ = self.request(method, url)
         if not raw_text:
@@ -137,7 +157,9 @@ class WorkflowRunCleaner:
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Response is not valid JSON: {exc}") from exc
 
-    def request(self, method: str, url: str) -> tuple[str, dict[str, str], int]:
+    def request(
+        self, method: str, url: str
+    ) -> tuple[str, dict[str, str], int]:
         # HTTP 请求统一从这里发出，避免多处重复拼接请求头。
         headers = {
             "Accept": "application/vnd.github+json",
@@ -161,7 +183,9 @@ class WorkflowRunCleaner:
         if not self.config.summary_path:
             return
 
-        workflow_info_lines = build_workflow_info_lines(self.config, self.current_time)
+        workflow_info_lines = build_workflow_info_lines(
+            self.config, self.current_time
+        )
         summary_lines = [
             "# DeleteOldRuns",
             "",
@@ -215,7 +239,9 @@ def load_config() -> CleanupConfig:
         os.getenv("GITHUB_RUN_ID", "").strip(), default=0
     )
     hour_count = parse_hour_count(os.getenv("HOUR_COUNT", "").strip())
-    api_base_url = os.getenv("GITHUB_API_URL", "https://api.github.com").strip()
+    api_base_url = os.getenv(
+        "GITHUB_API_URL", "https://api.github.com"
+    ).strip()
     if not api_base_url:
         api_base_url = "https://api.github.com"
     summary_path = os.getenv("GITHUB_STEP_SUMMARY", "").strip()
@@ -276,50 +302,72 @@ def build_workflow_info_lines(
     config: CleanupConfig, current_time: datetime
 ) -> list[str]:
     # 工作流信息区块会在这里补齐 delete_old_runs 需要展示的完整字段集合。
-    beijing_time = current_time.astimezone(timezone(timedelta(hours=8))).strftime(
-        "%Y-%m-%d %H:%M:%S:%f"
-    )[:-3]
+    # 这些字段和主签到工作流保持同一套展示口径，便于对照两类 Summary。
+    beijing_time = current_time.astimezone(
+        timezone(timedelta(hours=8))
+    ).strftime("%Y-%m-%d %H:%M:%S:%f")[:-3]
     triggering_actor = os.getenv("GITHUB_TRIGGERING_ACTOR", "").strip()
     actor_name = os.getenv("GITHUB_ACTOR", "").strip()
     # 重新运行工作流时，展示值优先使用当前触发重跑的操作者，没有时再回退到最初触发者。
     initiated_run_by = triggering_actor or actor_name
     return [
-        "Branch Name：" + describe_runtime_value(
-            os.getenv("GITHUB_REF_NAME", "").strip(), "当前环境未提供 GITHUB_REF_NAME"
+        build_workflow_info_line(
+            "Branch Name",
+            os.getenv("GITHUB_REF_NAME", "").strip(),
+            "当前环境未提供 GITHUB_REF_NAME",
         ),
-        "Triggered By：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Triggered By",
             os.getenv("GITHUB_EVENT_NAME", "").strip(),
             "当前环境未提供 GITHUB_EVENT_NAME",
         ),
-        "Initial Run By：" + describe_runtime_value(
-            actor_name, "当前环境未提供 GITHUB_ACTOR"
+        build_workflow_info_line(
+            "Initial Run By",
+            actor_name,
+            "当前环境未提供 GITHUB_ACTOR",
         ),
-        "Initial Run By ID：" + describe_runtime_value(
-            os.getenv("GITHUB_ACTOR_ID", "").strip(), "当前环境未提供 GITHUB_ACTOR_ID"
+        build_workflow_info_line(
+            "Initial Run By ID",
+            os.getenv("GITHUB_ACTOR_ID", "").strip(),
+            "当前环境未提供 GITHUB_ACTOR_ID",
         ),
-        "Initiated Run By：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Initiated Run By",
             initiated_run_by, "当前环境未提供 GITHUB_TRIGGERING_ACTOR"
         ),
-        "Repository Name：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Repository Name",
             config.repository_name, "当前环境未提供 GITHUB_REPOSITORY"
         ),
-        "Commit SHA：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Commit SHA",
             os.getenv("GITHUB_SHA", "").strip(), "当前环境未提供 GITHUB_SHA"
         ),
-        "Workflow Name：" + describe_runtime_value(
-            os.getenv("GITHUB_WORKFLOW", "").strip(), "当前环境未提供 GITHUB_WORKFLOW"
+        build_workflow_info_line(
+            "Workflow Name",
+            os.getenv("GITHUB_WORKFLOW", "").strip(),
+            "当前环境未提供 GITHUB_WORKFLOW",
         ),
-        "Workflow Number：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Workflow Number",
             os.getenv("GITHUB_RUN_NUMBER", "").strip(),
             "当前环境未提供 GITHUB_RUN_NUMBER",
         ),
-        "Workflow ID：" + describe_runtime_value(
+        build_workflow_info_line(
+            "Workflow ID",
             str(config.current_run_id) if config.current_run_id else "",
             "当前环境未提供 GITHUB_RUN_ID",
         ),
         f"Beijing Time：{beijing_time}",
         "Copyright © 2026 NianBroken. All rights reserved.",
     ]
+
+
+def build_workflow_info_line(
+    label: str, value: str, fallback_message: str
+) -> str:
+    # 工作流字段统一在这里拼接，避免多段字符串相加造成换行规则冲突。
+    return f"{label}：{describe_runtime_value(value, fallback_message)}"
 
 
 def describe_runtime_value(value: str, fallback_message: str) -> str:

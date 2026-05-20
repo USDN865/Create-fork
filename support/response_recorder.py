@@ -26,7 +26,9 @@ class ResponseRecorder:
         self.file_enabled = file_enabled
         # 控制台截断长度完全遵循配置值，具体合法性由配置加载阶段负责校验。
         self.console_truncate = console_truncate
+        # entries 顺序保存本次运行产生的全部原始响应块。
         self.entries: list[str] = []
+        # output_path 只在 finalize 成功写出文件后记录最终绝对路径。
         self.output_path = ""
 
     def _pretty_text(self, payload: Any, fallback_text: str) -> str:
@@ -82,9 +84,13 @@ class ResponseRecorder:
         if not self.file_enabled or not self.entries:
             return ""
 
+        # 输出目录按需创建，避免在未启用落盘时留下空目录。
         output_dir = Path("output") / "raw_responses"
         output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{now_in_timezone(self.timezone_name).strftime('%Y%m%d%H%M%S')}_{random.randint(10000, 99999)}.txt"
+        filename = (
+            f"{now_in_timezone(self.timezone_name).strftime('%Y%m%d%H%M%S')}_"
+            f"{random.randint(10000, 99999)}.txt"
+        )
         output_file = output_dir / filename
         output_file.write_text("\n\n".join(self.entries), encoding="utf-8")
         self.output_path = str(output_file.resolve())

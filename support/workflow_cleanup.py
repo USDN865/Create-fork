@@ -6,8 +6,10 @@ import os
 import sys
 from pathlib import Path
 
+# 工作流清理脚本固定沿用主程序默认时区和时间格式。
 TIMEZONE_NAME = "Asia/Shanghai"
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+# 这些快照文件只用于在日志中回显 Summary 内容，工作流结束前可以安全删除。
 TEMPORARY_SNAPSHOT_FILES = {
     "workflow_summary_snapshot.md",
     "delete_old_runs_summary_snapshot.md",
@@ -56,6 +58,7 @@ def main() -> int:
     # 工作流末尾的清理步骤不应吞掉前序失败，因此这里只负责尽力清理并输出结果。
     cleanup_runtime_artifacts, run_logger_class = ensure_project_imports()
     logger = run_logger_class(TIMEZONE_NAME, TIME_FORMAT)
+    # 工作流步骤默认在仓库根目录执行，这里直接把当前工作目录视为项目根目录。
     project_root = Path(os.getcwd())
     cleanup_runtime_artifacts(str(project_root), logger)
     remove_snapshot_files(project_root, logger)

@@ -51,7 +51,11 @@ class RetryManager:
             # 仍有剩余次数时，先记录失败原因，再按固定间隔等待下一次尝试。
             self.logger.error(
                 stage,
-                f"第 {attempt} 次执行失败，{self.interval_seconds} 秒后重试。失败原因: {reason}",
+                (
+                    f"第 {attempt} 次执行失败，"
+                    f"{self.interval_seconds} 秒后重试。"
+                    f"失败原因: {reason}"
+                ),
             )
             time.sleep(self.interval_seconds)
 

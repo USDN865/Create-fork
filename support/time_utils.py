@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 
 DEFAULT_TIMEZONE_NAME = "Asia/Shanghai"
+# 统一默认到上海时区，保证本地运行和 GitHub Actions 的日期判断基线一致。
 
 
 def get_timezone(timezone_name: str) -> ZoneInfo:
@@ -37,14 +38,17 @@ def format_unix_timestamp(
 ) -> str:
     # 签到接口返回的秒级时间戳会在这里统一转换为配置要求的本地时间字符串。
     timestamp_seconds = float(timestamp_value)
-    local_time = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc).astimezone(
-        get_timezone(timezone_name)
-    )
+    local_time = datetime.fromtimestamp(
+        timestamp_seconds, tz=timezone.utc
+    ).astimezone(get_timezone(timezone_name))
     return format_datetime(local_time, time_format)
 
 
 def parse_sign_history_items(
-    sign_in_month: list[dict], timezone_name: str, time_format: str, limit: int = 5
+    sign_in_month: list[dict],
+    timezone_name: str,
+    time_format: str,
+    limit: int = 5,
 ) -> list[str]:
     # 最近签到记录优先使用秒级时间戳换算时间，缺少时间戳时再回退到接口直接提供的日期文本。
     # 返回顺序和接口列表顺序保持一致，通常是最新记录在前，较旧记录在后。
@@ -56,7 +60,9 @@ def parse_sign_history_items(
             try:
                 # 时间戳能够解析时，直接采用本地化后的完整日期时间。
                 recent_items.append(
-                    format_unix_timestamp(sign_timestamp, timezone_name, time_format)
+                    format_unix_timestamp(
+                        sign_timestamp, timezone_name, time_format
+                    )
                 )
                 continue
             except Exception:

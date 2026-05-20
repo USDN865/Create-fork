@@ -33,6 +33,7 @@ def build_summary(
     # Summary 最终输出为 Markdown 文本，区块顺序完全遵循配置给出的 sections。
     section_order = layout_config.get("sections", [])
     builders: dict[str, Callable[[ExecutionSnapshot], SummaryBlock | None]] = {
+        # 区块键名和构造函数的映射集中在这里，便于配置层和渲染层保持一一对应。
         "headline": _headline,
         "config_sources": _config_sources,
         "result": _result,
@@ -97,7 +98,9 @@ def _result(snapshot: ExecutionSnapshot) -> SummaryBlock:
     return SummaryBlock(lines=lines)
 
 
-def _build_stage_result_line(snapshot: ExecutionSnapshot, stage_key: str) -> str:
+def _build_stage_result_line(
+    snapshot: ExecutionSnapshot, stage_key: str
+) -> str:
     # 单个阶段没有结果时，会明确说明流程尚未进入该阶段。
     result = snapshot.stage_results.get(stage_key)
     stage_label = STAGE_LABELS[stage_key]
@@ -137,7 +140,9 @@ def _timeline(snapshot: ExecutionSnapshot) -> SummaryBlock | None:
     if not snapshot.timeline:
         return None
     timeline_lines = [
-        item.raw_line.rstrip() for item in snapshot.timeline if item.raw_line.strip()
+        item.raw_line.rstrip()
+        for item in snapshot.timeline
+        if item.raw_line.strip()
     ]
     if not timeline_lines:
         return None

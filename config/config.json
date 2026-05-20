@@ -31,7 +31,7 @@
     "manual_force_push_env": "XIXUNYUN_FORCE_PUSH"
   },
   "account": {
-    "_comment": "这个区块保存签到主体和地点信息。学校、账号、密码用于登录。地址、地点名称和经纬度用于发起签到，留空时程序会尝试从签到查询接口中补足。",
+    "_comment": "这个区块保存签到主体和地点信息。学校、账号、密码用于登录。地址和经纬度用于发起签到，留空时程序会尝试从签到查询接口中补足。地点名称留空时会回退到运行时默认地址名称。",
     "school_name": {
       "_comment": "school_name 的 value 表示学校全称。只有 school_id 为空时程序才会使用这个名称去学校查询接口做精确匹配。env_name 表示对应的环境变量名。",
       "value": "",
@@ -58,7 +58,7 @@
       "env_name": "XIXUNYUN_ADDRESS"
     },
     "address_name": {
-      "_comment": "address_name 的 value 表示地点名称。留空时程序会先看账号配置，再回退到运行时默认地址名称。env_name 表示对应的环境变量名。",
+      "_comment": "address_name 的 value 表示地点名称。留空时程序会直接回退到运行时默认地址名称。env_name 表示对应的环境变量名。",
       "value": "",
       "env_name": "XIXUNYUN_ADDRESS_NAME"
     },
@@ -88,42 +88,34 @@
     "_comment_force_push": "force_push 表示重复签到结果是否仍然发送通知。GitHub Actions 手动运行时，这个值还可以被工作流输入覆盖。",
     "force_push": false,
     "message_layouts": {
-      "_comment": "这里声明不同结果状态下的消息正文区块顺序。数组里移除某个区块名后，对应内容就不会出现在通知正文中。",
-      "_comment_success_sections": "success_sections 表示签到成功时的正文区块顺序。",
+      "_comment": "这里声明消息正文四个部分的顺序。只有同时提供 overview、recent_signs、profile、delivery 这四个部分时，程序才会按这里的顺序展示。",
+      "_comment_success_sections": "success_sections 表示签到成功时的四段正文顺序。",
       "success_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "force_push",
-        "source",
-        "status"
+        "delivery"
       ],
-      "_comment_failure_sections": "failure_sections 表示签到失败时的正文区块顺序。",
+      "_comment_failure_sections": "failure_sections 表示签到失败时的四段正文顺序。",
       "failure_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "reason",
-        "source",
-        "status"
+        "delivery"
       ],
-      "_comment_exception_sections": "exception_sections 表示程序异常时的正文区块顺序。",
+      "_comment_exception_sections": "exception_sections 表示程序异常时的四段正文顺序。",
       "exception_sections": [
-        "reason",
-        "stage",
-        "error_location",
-        "context",
-        "source",
-        "status"
-      ],
-      "_comment_repeated_sections": "repeated_sections 表示重复签到时的正文区块顺序。",
-      "repeated_sections": [
-        "score_summary",
+        "overview",
         "recent_signs",
         "profile",
-        "force_push",
-        "source",
-        "status"
+        "delivery"
+      ],
+      "_comment_repeated_sections": "repeated_sections 表示重复签到时的四段正文顺序。",
+      "repeated_sections": [
+        "overview",
+        "recent_signs",
+        "profile",
+        "delivery"
       ]
     },
     "summary_layouts": {

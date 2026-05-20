@@ -25,7 +25,7 @@ SAFE_FILE_SUFFIXES = {
 }
 
 SAFE_FILE_NAMES = {
-    # 某些无后缀缓存文件需要单独按文件名识别。
+    # 某些白名单文件不依赖后缀判断，需要单独按文件名识别。
     "__init__",
 }
 
@@ -58,7 +58,9 @@ def cleanup_runtime_artifacts(project_root: str, logger: RunLogger) -> None:
 
         # 白名单文件会按后缀或文件名匹配后删除。
         if path.is_file():
-            if path.name in SAFE_FILE_NAMES or path.suffix in SAFE_FILE_SUFFIXES:
+            matches_safe_name = path.name in SAFE_FILE_NAMES
+            matches_safe_suffix = path.suffix in SAFE_FILE_SUFFIXES
+            if matches_safe_name or matches_safe_suffix:
                 _delete_file(path, deleted_paths, failed_paths)
 
     # 清理完成后会统一输出删除结果，便于判断这次运行是否留下缓存。
@@ -90,6 +92,7 @@ def _delete_directory(
         except FileNotFoundError:
             continue
         except OSError:
+            # 子项删除失败时直接停止当前目录清理，避免继续删除后留下半清理状态。
             failed_paths.append(str(child.resolve()))
             return
     try:
@@ -101,7 +104,9 @@ def _delete_directory(
         failed_paths.append(str(path.resolve()))
 
 
-def _delete_file(path: Path, deleted_paths: list[str], failed_paths: list[str]) -> None:
+def _delete_file(
+    path: Path, deleted_paths: list[str], failed_paths: list[str]
+) -> None:
     # 文件删除单独走一个出口，删除策略和结果收集都集中在这里。
     if not path.exists():
         return

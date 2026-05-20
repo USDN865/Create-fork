@@ -22,7 +22,13 @@ class EndpointDefinition:
 
 MOBILE_DEFAULT_HEADERS = {
     # 这一组请求头用来模拟移动端 WebView，尽量贴近真实手机客户端的访问特征。
-    "User-Agent": "Mozilla/5.0 (Linux; Android 13; 22101316C Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36",
+    "User-Agent": (
+        "Mozilla/5.0 "
+        "(Linux; Android 13; 22101316C Build/TQ3A.230901.001; wv) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 "
+        "Mobile Safari/537.36"
+    ),
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "zh-CN,zh;q=0.9",
     "Connection": "keep-alive",

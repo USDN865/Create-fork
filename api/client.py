@@ -187,7 +187,8 @@ class ApiClient:
         except Exception:
             parsed_json = None
 
-        # 只有 HTTP 状态码缺失或 curl 进程明确失败时，才把异常信息写入结果。
+        # 回退结果只有在未拿到 HTTP 状态码时，才把异常文本写入统一结果字段。
+        # 只要系统 curl 已经返回状态码，后续阶段就继续按 HTTP 结果和业务结果判断成败。
         combined_error_text = f"curl_cffi 异常: {original_error_text}"
         if completed.returncode != 0 and stderr_text:
             combined_error_text = (
