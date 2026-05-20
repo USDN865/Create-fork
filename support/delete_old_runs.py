@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+# 这些常量统一控制默认保留时长、单次请求超时和每页拉取的工作流数量。
 DEFAULT_HOUR_COUNT = 168
 REQUEST_TIMEOUT_SECONDS = 30
 RUNS_PER_PAGE = 100
@@ -31,9 +32,12 @@ class WorkflowRunCleaner:
     # 清理逻辑集中在这个类里，避免工作流文件里堆叠复杂脚本。
     def __init__(self, config: CleanupConfig) -> None:
         self.config = config
+        # 过期判断统一以脚本启动时记录的 UTC 时间为准，整个清理过程不再重复取当前时间。
         self.current_time = datetime.now(timezone.utc)
+        # 扫描数量和删除数量会在运行结束后写入日志和 Summary。
         self.deleted_count = 0
         self.scanned_count = 0
+        # 列表接口地址在初始化阶段一次性拼好，后续分页遍历直接复用。
         self.runs_url = (
             f"{self.config.api_base_url.rstrip('/')}"
             f"/repos/{self.config.repository_name}/actions/runs?per_page={RUNS_PER_PAGE}"
@@ -277,6 +281,7 @@ def build_workflow_info_lines(
     )[:-3]
     triggering_actor = os.getenv("GITHUB_TRIGGERING_ACTOR", "").strip()
     actor_name = os.getenv("GITHUB_ACTOR", "").strip()
+    # 重新运行工作流时，展示值优先使用当前触发重跑的操作者，没有时再回退到最初触发者。
     initiated_run_by = triggering_actor or actor_name
     return [
         "Branch Name：" + describe_runtime_value(

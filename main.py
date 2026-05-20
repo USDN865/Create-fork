@@ -47,6 +47,7 @@ from support.time_utils import (
 )
 
 
+# 配置文件路径允许通过环境变量覆盖，未提供时统一回退到仓库内默认配置文件。
 CONFIG_PATH = os.getenv("XIXUNYUN_CONFIG_PATH", "config/config.json")
 
 
@@ -57,6 +58,7 @@ def main() -> int:
     logger: RunLogger | None = None
     response_recorder: ResponseRecorder | None = None
     api_client: ApiClient | None = None
+    # 配置加载失败时也需要保留一份最小化执行快照，用来承接错误状态、Summary 和异常消息。
     snapshot = ExecutionSnapshot(
         environment_label=environment.source_label,
         force_push_active=resolve_force_push_bootstrap(
@@ -440,6 +442,7 @@ def build_workflow_info_lines(
     beijing_time_text = format_datetime(
         now_in_timezone("Asia/Shanghai"), "%Y-%m-%d %H:%M:%S:%f"
     )[:-3]
+    # 重新运行工作流时，展示值优先使用当前触发重跑的操作者，没有时再回退到最初触发者。
     initiated_run_by = environment.triggering_actor or environment.actor_name
     return [
         f"Force Push Message：{str(force_push_active)}",

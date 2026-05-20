@@ -20,6 +20,7 @@ from core.models import (
 # 这个环境变量名用于在 GitHub Actions 中直接接收消息推送开关。
 # 当整包 Secret JSON 没有给出 notification.enabled 时，会回退到这里继续解析。
 NOTIFICATION_ENABLED_ENV_NAME = "XIXUNYUN_NOTIFICATION_ENABLED"
+# 这些默认值会在配置字段缺失或引导阶段预读取时统一接管，保证正式加载和预判逻辑使用同一套基线。
 DEFAULT_TIMEZONE_NAME = "Asia/Shanghai"
 DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_ADDRESS_NAME = "中国"
@@ -29,6 +30,7 @@ DEFAULT_RETRY_ATTEMPTS = 3
 DEFAULT_RETRY_INTERVAL_SECONDS = 5
 DEFAULT_SIGN_SUBMIT_DELAY_SECONDS = 3
 DEFAULT_TARGET_SIGN_TYPE = "上班"
+# 这两个默认环境变量名分别对应整包 Secret JSON 和 GitHub Actions 手动输入的强制推送开关。
 DEFAULT_SECRET_OVERRIDES_ENV_NAME = "XIXUNYUN_SECRET_OVERRIDES_JSON"
 DEFAULT_FORCE_PUSH_ENV_NAME = "XIXUNYUN_FORCE_PUSH"
 

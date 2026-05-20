@@ -125,6 +125,7 @@ class ApiClient:
         original_error_text: str,
     ) -> ApiCallResult | None:
         # 当 Python 层请求失败时，这里会改用系统 curl 再尝试一次同样的请求。
+        # Windows 和非 Windows 环境的 curl 可执行文件名不同，这里按系统类型选择。
         curl_binary = "curl.exe" if os.name == "nt" else "curl"
         url = endpoint.url
         if params:

@@ -53,6 +53,7 @@ def send_notification(
     except Exception:
         response_json = None
 
+    # 返回结果同时保留 HTTP 层状态、响应正文和已经解析完成的请求参数，便于日志记录直接复用。
     return {
         "http_status": response.status_code,
         "raw_text": response_text,
