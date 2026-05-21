@@ -6,10 +6,11 @@ name: XiXunYunSignin
 run-name: ${{ github.workflow }} ${{ github.sha }}
 
 on:
-  # GitHub Actions 的 cron 表达式固定按 UTC 计算。
-  # 这里安排在 UTC 00:00 执行，对应北京时间每天 08:00。
+  # GitHub Actions 支持在 schedule 中直接指定 IANA 时区。
+  # 这里按 Asia/Shanghai 时区安排在每天 08:00 执行。
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 8 * * *"
+      timezone: "Asia/Shanghai"
 
   # 手动运行时提供强制推送开关，用来决定重复签到结果是否也发送通知。
   workflow_dispatch:
