@@ -8,8 +8,9 @@ run-name: ${{ github.workflow }} ${{ github.run_id }}
 on:
   # GitHub Actions 支持在 schedule 中直接指定 IANA 时区。
   # 这里按 Asia/Shanghai 时区安排在每天 00:00 执行。
+  # 注意到 GitHub Actions 会比实际运行时间慢 2 小时左右，所以使用 22 点
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 22 * * *"
       timezone: "Asia/Shanghai"
 
   # 手动运行时允许直接指定清理阈值小时数。
