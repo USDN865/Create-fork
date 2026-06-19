@@ -10,7 +10,7 @@ on:
   # 这里按 Asia/Shanghai 时区安排在每天 08:00 执行。
   # 注意到 GitHub Actions 会比实际运行时间慢 2 小时左右，所以使用 6 点
   schedule:
-    - cron: "0 6 * * *"
+    #- cron: "0 6 * * *"#
       timezone: "Asia/Shanghai"
 
   # 手动运行时提供强制推送开关，用来决定重复签到结果是否也发送通知。
